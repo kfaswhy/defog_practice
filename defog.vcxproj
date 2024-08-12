@@ -127,11 +127,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="bmp_process.cpp" />
     <ClCompile Include="defog.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bmp_process.h" />
     <ClInclude Include="defog.h" />
   </ItemGroup>
   <ItemGroup>

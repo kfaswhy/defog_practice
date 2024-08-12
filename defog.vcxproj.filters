@@ -18,14 +18,8 @@
     <ClCompile Include="defog.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="bmp_process.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bmp_process.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="defog.h">
       <Filter>头文件</Filter>
     </ClInclude>
