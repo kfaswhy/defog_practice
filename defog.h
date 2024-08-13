@@ -3,7 +3,12 @@
 
 #include <iostream>
 #include <windows.h> 
-#include "bmp_process.h"
+
+#define u8max (255)
+#define u8min (0)
+#define calc_min(a,b) ((a)>(b)?(b):(a))
+#define calc_max(a,b) ((a)<(b)?(b):(a))
+
 typedef struct _RGB
 {
 	BYTE b;
@@ -20,10 +25,13 @@ typedef struct
 }RGBA;
 
 
+int img_darken(RGB* img);
+
+int img_process(RGB* img);
+
 RGB* load_bmp(const char* filename);
 
 void save_bmp(const char* filename, RGB* img);
 
-int img_process(RGB* img);
 
 #endif
