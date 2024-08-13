@@ -14,7 +14,7 @@ U32 dark_related_mask = 0;//暗通道最小值过滤：相对mask尺寸，若为
 U32 dark_fixed_mask = 10; //暗通道最小值过滤：固定mask大小
 
 int kernel_size = 11; //暗通道高斯卷积：核大小
-float sigma = 0.8; //暗通道高斯卷积：方差
+float sigma = 2; //暗通道高斯卷积：方差
 
 
 int main()
@@ -132,7 +132,6 @@ int calc_min_filtered(RGB* img, RGB* filtered)
 	return 0; // 返回 0 表示成功
 }
 
-
 void create_gaussian_kernel(float* kernel, int kernel_size, float sigma) {
 	int i, j;
 	float sum = 0.0f;
@@ -155,9 +154,9 @@ void create_gaussian_kernel(float* kernel, int kernel_size, float sigma) {
 		for (j = 0; j < kernel_size; j++)
 		{
 			kernel[i * kernel_size + j] /= sum;
-			printf("%.2f, ", kernel[i * kernel_size + j]);
+			//printf("%.2f, ", kernel[i * kernel_size + j]);
 		}
-		printf("\n");
+		//printf("\n");
 	}
 }
 
@@ -203,7 +202,6 @@ int calc_gauss_filtered(RGB* img, RGB* filtered) {
 	LOG("done.");
 	return 0; // Success
 }
-
 
 int img_process(RGB* img)
 {
