@@ -105,12 +105,9 @@ int calc_min_filtered(RGB* img, RGB* filtered)
 			}
 
 			// 将最小值存储到过滤后的图像中
-			//filtered[y * width + x].r = rgb_min;
-			//filtered[y * width + x].g = rgb_min;
-			//filtered[y * width + x].b = rgb_min;
-			filtered[y * width + x].r = U8MAX;
-			filtered[y * width + x].g = U8MAX;
-			filtered[y * width + x].b = U8MAX;
+			filtered[y * width + x].r = rgb_min;
+			filtered[y * width + x].g = rgb_min;
+			filtered[y * width + x].b = rgb_min;
 		}
 	}
 
