@@ -8,7 +8,10 @@ int width = 0;
 int PaddingSize = 0;
 BYTE* pad = NULL;
 
-int mask_size = 9;
+U32 dark_related_mask = 100;//暗通道最小值过滤时的相对mask尺寸，若为0则使用固定大小
+U32 dark_fixed_mask = 3; //暗通道最小值过滤时的固定mask大小
+
+
 
 int main()
 {
@@ -44,28 +47,47 @@ int calc_dark_chanel(RGB* img, RGB* img_dark)
 		for (int j = 0; j < width; j++) {
 			int index = i * width + j;
 			/* 像素运算 */
-			int rgb_min = u8max;
+			int rgb_min = U8MAX;
 			rgb_min = calc_min(rgb_min, img[index].r);
 			rgb_min = calc_min(rgb_min, img[index].g);
 			rgb_min = calc_min(rgb_min, img[index].b);
-			rgb_min = calc_max(rgb_min, u8min);
+			rgb_min = calc_max(rgb_min, U8MIN);
 			img_dark[index].r = rgb_min;
 			img_dark[index].g = rgb_min;
 			img_dark[index].b = rgb_min;
 			/* 像素运算结束 */
 		}
 	}
+	LOG("done.");
 
 	return 0;
 }
 
-int calc_dark_filtered(RGB* img_dark, RGB* filtered)
+int calc_min_filtered(RGB* img, RGB* filtered)
 {
-	int half_mask = mask_size / 2;
+	U32 mask = 0;
+	if (dark_related_mask != 0)
+	{
+		if (width > height)
+		{
+			mask = height / dark_related_mask;
+		}
+		else
+		{
+			mask = width / dark_related_mask;
+		}
+	}
+	else
+	{
+		mask = dark_fixed_mask;
+	}
+
+
+	int half_mask = mask / 2;
 	// 遍历图像中的每个像素
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
-			int rgb_min = u8max;
+			int rgb_min = U8MAX;
 
 			// 遍历滤波掩膜区域
 			for (int ky = -half_mask; ky <= half_mask; ky++) {
@@ -76,20 +98,32 @@ int calc_dark_filtered(RGB* img_dark, RGB* filtered)
 					// 检查边界条件
 					if (yy >= 0 && yy < height && xx >= 0 && xx < width) {
 						int index = yy * width + xx;
-						rgb_min = calc_min(rgb_min, img_dark[index].r);
-						rgb_min = calc_max(rgb_min, u8min);
+						rgb_min = calc_min(rgb_min, img[index].r);
+						rgb_min = calc_max(rgb_min, U8MIN);
 					}
 				}
 			}
 
 			// 将最小值存储到过滤后的图像中
-			filtered[y * width + x].r = rgb_min;
-			filtered[y * width + x].g = rgb_min;
-			filtered[y * width + x].b = rgb_min;
+			//filtered[y * width + x].r = rgb_min;
+			//filtered[y * width + x].g = rgb_min;
+			//filtered[y * width + x].b = rgb_min;
+			filtered[y * width + x].r = U8MAX;
+			filtered[y * width + x].g = U8MAX;
+			filtered[y * width + x].b = U8MAX;
 		}
 	}
 
+	LOG("done.");
+
 	return 0; // 返回 0 表示成功
+}
+
+int calc_gauss(RGB* img, RGB* img_dark)
+{
+	LOG("done.");
+	
+	return 0;
 }
 
 int img_process(RGB* img)
@@ -103,7 +137,7 @@ int img_process(RGB* img)
 
 	//暗通道滤波
 	RGB* img_dark_filtered = (RGB*)malloc(sizeof(RGB) * height * width);
-	calc_dark_filtered(img_dark, img_dark_filtered);
+	calc_min_filtered(img_dark, img_dark_filtered);
 	char bmp_dark_filtered[] = "C:/Work/Desktop/3_dark_filtered.bmp";
 	save_bmp(bmp_dark_filtered, img_dark_filtered);
 	return 0;
