@@ -6,6 +6,7 @@
 #include <time.h>
 
 #define U32 unsigned int
+#define U16 unsigned short
 #define U8 unsigned char 
 #define U8MAX (255)
 #define U8MIN (0)
@@ -14,7 +15,7 @@
 
 #define calc_min(a,b) ((a)>(b)?(b):(a))
 #define calc_max(a,b) ((a)<(b)?(b):(a))
-#define abs(a) ((a)>0?(a):(-a))
+#define calc_abs(a) ((a)>0?(a):(-a))
 
 #define LOG(...) printf("%s [%d]: ", __FUNCTION__, __LINE__);printf(__VA_ARGS__);printf("\n");
 
@@ -39,7 +40,21 @@ typedef struct
 }RGBA;
 
 
+int main();
+
+void print_prog(U32 cur_pos, U32 tgt);
+
 int img_darken(RGB* img);
+
+int calc_dark_chanel(RGB* img, RGB* img_dark);
+
+int calc_min_filtered(RGB* img);
+
+void create_gaussian_kernel(float* kernel, int kernel_size, float sigma);
+
+float calc_Interpolation(int x0, int x1, int y0, int y1, int x);
+
+int calc_gauss_filtered(RGB* img);
 
 int img_process(RGB* img);
 
