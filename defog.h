@@ -58,9 +58,9 @@ float calc_Interpolation(int x0, int x1, int y0, int y1, int x);
 
 int calc_gauss_filtered(RGB* img);
 
-int calc_trans(RGB* img, RGB* trans, RGB light);
+int calc_trans(RGB* img, float* trans, RGB light);
 
-void recover_img(RGB* img, RGB* img_rec, RGB* trans, RGB light);
+void recover_img(RGB* img, RGB* img_rec, float* trans, RGB light);
 
 int img_process(RGB* img);
 
