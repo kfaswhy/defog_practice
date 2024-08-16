@@ -9,14 +9,17 @@ BYTE* pad = NULL;
 
 
 //暗通道过滤参数
-U32 dark_related_mask = 0;//暗通道最小值过滤：相对mask尺寸，若为0则使用固定大小
-U32 dark_fixed_mask = 10; //暗通道最小值过滤：固定mask大小
+U32 dark_related_mask = 60;//暗通道最小值过滤：相对mask尺寸，若为0则使用固定大小
+U32 dark_fixed_mask = 20; //暗通道最小值过滤：固定mask大小
 
 //暗通道平滑参数
 int kernel_size = 15; //暗通道高斯卷积：核大小，0表示不做滤波
 float sigma = 5; //暗通道高斯卷积：方差
-int diff_thd0 = 60; // 暗通道高斯卷积：邻像素差高于此值时，权重为0；
-int diff_thd1 = 50; // 暗通道高斯卷积：邻像素差低于此值时，权重为1；
+int diff_thd0 = 100; // 暗通道高斯卷积：邻像素差高于此值时，权重为0；
+int diff_thd1 = 30; // 暗通道高斯卷积：邻像素差低于此值时，权重为1；
+
+//透射系数
+float omega = 0.9;
  
 int main()
 {
@@ -30,45 +33,15 @@ int main()
 	return 0;
 }
 
-RGB calc_atmos_light(RGB* img, RGB* img_dark)
-{
-	U32 max_dark = 0;
-	int max_i = 0;
-	int max_j = 0;
-	RGB light = { 0 };
-	for (int i = 0; i < height; i++)
-	{
-		for (int j = 0; j < width; j++) 
-		{
-			int index = i * width + j;
-			if (img_dark[index].r > max_dark)
-			{
-				if (img[index].r <= img_dark[index].r ||
-					img[index].g <= img_dark[index].r ||
-					img[index].b <= img_dark[index].r)
-				{
-					//max_dark = img_dark[index].r;
-					max_i = i;
-					max_j = j;
-				}
-				
-			}
-		}
-	}
-	int index = max_i * width + max_j;
-	max_dark = img_dark[index].r;
-	light.r = img[index].r;
-	light.g = img[index].g;
-	light.b = img[index].b;
-	LOG("pos=[%d,%d], max_dark=%u, light=[%u,%u,%u]",
-		max_i, max_j, max_dark, light.r, light.g, light.b);
-
-	return light;
-}
-
 int img_process(RGB* img)
 {
 	//img_darken(img);
+
+	//原图高斯滤波
+	//calc_gauss_filtered(img);
+	//char bmp_dark_gauss[] = "C:/Work/Desktop/1_gauss.bmp";
+	//save_bmp(bmp_dark_gauss, img);
+
 	//计算暗通道
 	RGB* img_dark = (RGB*)malloc(sizeof(RGB) * height * width);
 	calc_dark_chanel(img, img_dark);
@@ -80,17 +53,66 @@ int img_process(RGB* img)
 	char bmp_dark_filtered[] = "C:/Work/Desktop/3_dark_filtered.bmp";
 	save_bmp(bmp_dark_filtered, img_dark);
 
-	//暗通道低通滤波
-	calc_gauss_filtered(img_dark);
-	char bmp_dark_gauss[] = "C:/Work/Desktop/4_dark_gauss.bmp";
-	save_bmp(bmp_dark_gauss, img_dark);
+	//暗通道高斯滤波
+	//calc_gauss_filtered(img_dark);
+	//char bmp_dark_gauss[] = "C:/Work/Desktop/4_dark_gauss.bmp";
+	//save_bmp(bmp_dark_gauss, img_dark);
 
 	//估算大气光
 	RGB light = calc_atmos_light(img, img_dark);
 
+	//估算透射系数
+	RGB* trans = (RGB*)malloc(sizeof(RGB) * height * width);
+	calc_trans(img, trans, light);
+	char bmp_trans[] = "C:/Work/Desktop/5_trans.bmp";
+	save_bmp(bmp_trans, trans);
+
+	//恢复图像
+	RGB* img_rec = (RGB*)malloc(sizeof(RGB) * height * width);
+	recover_img(img, img_rec, trans, light);
+	char bmp_recover[] = "C:/Work/Desktop/6_recover.bmp";
+	save_bmp(bmp_recover, img_rec);
+
 
 	return 0;
 }
+
+
+RGB calc_atmos_light(RGB* img, RGB* img_dark)
+{
+	U32 max_dark = 0;
+	int max_i = 0;
+	int max_j = 0;
+	RGB light = { 0 };
+	for (int i = 0; i < height; i++)
+	{
+		for (int j = 0; j < width; j++)
+		{
+			int index = i * width + j;
+			if (img_dark[index].r > max_dark)
+			{
+				//if (img[index].r == img_dark[index].r || img[index].g == img_dark[index].r || img[index].b == img_dark[index].r)
+				//{
+					max_i = i;
+					max_j = j;
+					max_dark = img_dark[index].r;
+				//}
+			}
+
+		}
+	}
+
+	int index = max_i * width + max_j;
+	//max_dark = img_dark[index].r;
+	light.r = img[index].r;
+	light.g = img[index].g;
+	light.b = img[index].b;
+	LOG("pos=[%d,%d], max_dark=%u, light=[%u,%u,%u]",
+		height - max_i - 1, max_j, max_dark, light.r, light.g, light.b);
+
+	return light;
+}
+
 
 void print_prog(U32 cur_pos, U32 tgt)
 {
@@ -328,7 +350,49 @@ int calc_gauss_filtered(RGB* img)
 	return 0; // Success
 }
 
+int calc_trans(RGB* img, RGB* trans, RGB light)
+{
+	float tmp = 0.0;
+	for (int y = 0; y < height; y++) 
+	{
+		for (int x = 0; x < width; x++) 
+		{
+			U32 index = y * width + x;
+			float trans_tmp = U8MAX;
+			RGB *cur = &img[index];
+			tmp = (float)cur->r / calc_max(light.r, 1);
+			trans_tmp = calc_min(trans_tmp, tmp);
+			tmp = (float)cur->g / calc_max(light.g, 1);
+			trans_tmp = calc_min(trans_tmp, tmp);
+			tmp = (float)cur->b / calc_max(light.b, 1);
+			trans_tmp = calc_min(trans_tmp, tmp);
 
+			trans_tmp = 1.0 - omega * trans_tmp;
+			//trans_tmp *= 255;
+
+			trans[index].r = trans_tmp;
+			trans[index].g = trans_tmp;
+			trans[index].b = trans_tmp;
+		}
+	}
+	
+	return 0;
+}
+
+void recover_img(RGB* img, RGB* img_rec, RGB* trans, RGB light)
+{
+	for (int y = 0; y < height; y++)
+	{
+		for (int x = 0; x < width; x++)
+		{
+			U32 index = y * width + x;
+			float t = calc_max(trans[index].r, 0.01);
+			img_rec[index].r = (unsigned char)calc_min(255, ((float)img[index].r - light.r) / t + light.r);
+			img_rec[index].g = (unsigned char)calc_min(255, ((float)img[index].g - light.g) / t + light.g);
+			img_rec[index].b = (unsigned char)calc_min(255, ((float)img[index].b - light.b) / t + light.b);
+		}
+	}
+}
 
 RGB* load_bmp(const char* filename)
 {

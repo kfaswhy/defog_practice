@@ -44,6 +44,8 @@ int main();
 
 void print_prog(U32 cur_pos, U32 tgt);
 
+RGB calc_atmos_light(RGB* img, RGB* img_dark);
+
 int img_darken(RGB* img);
 
 int calc_dark_chanel(RGB* img, RGB* img_dark);
@@ -55,6 +57,10 @@ void create_gaussian_kernel(float* kernel, int kernel_size, float sigma);
 float calc_Interpolation(int x0, int x1, int y0, int y1, int x);
 
 int calc_gauss_filtered(RGB* img);
+
+int calc_trans(RGB* img, RGB* trans, RGB light);
+
+void recover_img(RGB* img, RGB* img_rec, RGB* trans, RGB light);
 
 int img_process(RGB* img);
 
