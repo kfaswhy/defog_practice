@@ -22,7 +22,7 @@ int diff_thd1 = 30; // 暗通道高斯卷积：邻像素差低于此值时，权
 float light_ratio = 0.9;//大气光缩放
 
 //透射系数
-float omega = 0.6; //去雾强度
+float omega = 0.5; //去雾强度
  
 int main()
 {
@@ -385,7 +385,7 @@ int calc_trans(RGB* img, float* trans, RGB light)
 			trans[index]= trans_tmp;
 		}
 	}
-	
+	LOG("done.");
 	return 0;
 }
 
@@ -413,6 +413,7 @@ void recover_img(RGB* img, RGB* img_rec, float* trans, RGB light)
 			}*/
 		}
 	}
+	LOG("done.");
 }
 
 RGB* load_bmp(const char* filename)
