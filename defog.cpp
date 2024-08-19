@@ -9,8 +9,8 @@ BYTE* pad = NULL;
 
 
 //暗通道过滤参数
-U32 dark_related_mask = 100;//暗通道最小值过滤：相对mask尺寸，若为0则使用固定大小
-U32 dark_fixed_mask = 10; //暗通道最小值过滤：固定mask大小
+U32 dark_related_mask = 0;//暗通道最小值过滤：相对mask尺寸，若为0则使用固定大小
+U32 dark_fixed_mask = 5; //暗通道最小值过滤：固定mask大小
 
 //暗通道平滑参数
 int kernel_size = 15; //暗通道高斯卷积：核大小，0表示不做滤波
@@ -18,11 +18,11 @@ float sigma = 5; //暗通道高斯卷积：方差
 int diff_thd0 = 100; // 暗通道高斯卷积：邻像素差高于此值时，权重为0；
 int diff_thd1 = 30; // 暗通道高斯卷积：邻像素差低于此值时，权重为1；
 
-//大气光过滤
-float light_ratio = 1;
+//大气光计算
+float light_ratio = 0.9;//大气光缩放
 
 //透射系数
-float omega = 0.8;
+float omega = 0.6; //去雾强度
  
 int main()
 {
