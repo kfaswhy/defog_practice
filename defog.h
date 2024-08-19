@@ -16,6 +16,7 @@
 #define calc_min(a,b) ((a)>(b)?(b):(a))
 #define calc_max(a,b) ((a)<(b)?(b):(a))
 #define calc_abs(a) ((a)>0?(a):(-a))
+#define clp_range(min,x,max) calc_min(calc_max((x), (min)), (max))
 
 #define LOG(...) printf("%s [%d]: ", __FUNCTION__, __LINE__);printf(__VA_ARGS__);printf("\n");
 
