@@ -19,29 +19,36 @@ float light_ratio = 1.0;//大气光缩放
 
 //透射系数
 float omega = 0.5; //去雾强度
-int kernel_size = 5; //透射系数高斯卷积：核大小，0表示不做滤波
+int kernel_size = 0; //透射系数高斯卷积：核大小，0表示不做滤波
 float sigma = 111; //透射系数高斯卷积：方差
 int diff_thd0 = 100; // 透射系数高斯卷积：邻像素差高于此值时，权重为0；
 int diff_thd1 = 30; // 透射系数高斯卷积：邻像素差低于此值时，权重为1；
 
 //恢复图像
-S32 wgt_dark[] = { 
-	0,30,40,50,70,100,150,
-	190,215,240,250 };
-S32 wgt_str[] = { 
-	40,50,70,80,90,100,70,
-	70,70,70,70 };
+S32 wgt_size = 0;
+S32 *wgt_dark = NULL;
+S32 *wgt_str = NULL;
 
 int main()
 {
+	t0 = clock();
+	char cfg_setting[] = "setting.config";
+	load_cfg(cfg_setting);
+	
 	char bmp_in[] = "C:/Work/Desktop/1.bmp";
 	RGB* img = NULL;
 
 	img = load_bmp(bmp_in);
 	img_process(img);
 	//save_bmp(bmp_out, img);
+	t1 = clock();
+
+	U32 d_t = t1 - t0;
+	LOG("sum time = %.3f.", (float)d_t / 1000);
 	return 0;
 }
+ 
+
 
 int img_process(RGB* img)
 {
@@ -75,7 +82,7 @@ int img_process(RGB* img)
 
 	//恢复图像
 	RGB* img_rec = (RGB*)malloc(sizeof(RGB) * height * width);
-	recover_img(img, img_rec, img_dark, trans, light);
+	recover_img(img, img_rec, trans, light);
 	char bmp_recover[] = "C:/Work/Desktop/6_recover.bmp";
 	save_bmp(bmp_recover, img_rec);
 
@@ -118,8 +125,6 @@ RGB calc_atmos_light(RGB* img, RGB* img_dark)
 	light.r = img[index].r * ratio;
 	light.g = img[index].g * ratio;
 	light.b = img[index].b * ratio;
-
-
 
 	LOG("pos=[%d,%d], max_dark=%u, light=[%u,%u,%u]",
 		height - max_i - 1, max_j, max_dark, light.r, light.g, light.b);
@@ -309,19 +314,34 @@ float calc_distance(RGB* p1, RGB* p2)
 	U16 tmp = 0;
 	U16 sum = 0;
 	float diff = 0;
-	tmp = calc_abs((p1->r - p2->r));
-	sum += (tmp*tmp);
-	tmp = calc_abs((p1->g - p2->g));
-	sum += (tmp * tmp);
-	tmp = calc_abs((p1->b - p2->b));
-	sum += (tmp * tmp);
+	float diff_fast = 0;
+	U16 d_r = calc_abs((p1->r - p2->r));
+	sum += (d_r * d_r);
+	U16 d_g = calc_abs((p1->g - p2->g));
+	sum += (d_g * d_g);
+	U16 d_b = calc_abs((p1->b - p2->b));
+	sum += (d_b * d_b);
 	diff = sqrt((float)sum);
-	if (sum != 0)
-	{
-		//LOG("p1 = [%u,%u,%u], p2 = [%u,%u,%u], sum = %u, diff = %f.", \
-			p1->r, p1->g, p1->b, \
-			p2->r, p2->g, p2->b, sum,diff);
-	}
+	//U16 sum_gb = d_g * d_g + d_b * d_b;
+	//U16 sum_r = d_r * d_r;
+
+	//if (sum_gb >= sum_r)
+	//{
+	//	diff_fast = (float)sum_gb * 0.96 + 0.4 * sum_r;
+	//}
+	//else
+	//{
+	//	diff_fast = (float)sum_r + 0.4 * sum_gb;
+	//}
+	//
+
+
+	//if (sum != 0)
+	//{
+	//	LOG("p1 = [%u,%u,%u], p2 = [%u,%u,%u], sum = %u, diff = [%.2f,%.2f].", \
+	//		p1->r, p1->g, p1->b, \
+	//		p2->r, p2->g, p2->b, sum,diff, diff_fast);
+	//}
 	return diff;
 }
 
@@ -405,8 +425,7 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 			trans_tmp = calc_min(trans_tmp, tmp);
 			tmp = (float)cur->b / calc_max(light.b, 1);
 			trans_tmp = calc_min(trans_tmp, tmp);
-
-			float defog_str = (float)calc_interpolation_array(wgt_dark, wgt_str, sizeof(wgt_dark) / sizeof(S32), img_dark[index].r) / 100;
+			float defog_str = (float)calc_interpolation_array(wgt_dark, wgt_str, wgt_size, img_dark[index].r) / 100;
 			trans_tmp = 1.0 - clp_range(0, omega * defog_str, 1)*trans_tmp;
 			//trans_tmp *= 255;
 
@@ -448,7 +467,7 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 	return 0;
 }
 
-void recover_img(RGB* img, RGB* img_rec, RGB* img_dark, float* trans, RGB light)
+void recover_img(RGB* img, RGB* img_rec, float* trans, RGB light)
 {
 	for (int y = 0; y < height; y++)
 	{
@@ -532,4 +551,145 @@ void save_bmp(const char* filename, RGB* img)
 	}
 	fclose(f_out);
 	return;
+}
+
+S32 load_cfg(const char* filename)
+{
+	char buffer[10240];
+	S32 length = 0;
+	S32 array_size = 0;
+	cJSON* item = NULL;
+	S32 i = 0;
+
+	CONFIG_JSON config_json = { 0 };
+
+	FILE *f_config = fopen(filename, "r");
+	if (f_config == NULL)
+	{
+		LOG("Open setting.config ERROR."); // 如果打开文件失败，输出错误信息
+		return ERROR;
+	}
+
+	length = fread(buffer, 1, sizeof(buffer), f_config);
+
+	config_json.root = cJSON_Parse(buffer); // 将缓冲区中的JSON字符串解析成cJSON数据结构
+	if (config_json.root == NULL)
+	{
+		LOG("Config analysis ERROR."); // 如果解析JSON失败，输出错误信息
+		return ERROR;
+	}
+
+	config_json.iso = cJSON_GetObjectItem(config_json.root, "iso");
+	if (config_json.iso != NULL && cJSON_IsNumber(config_json.iso))
+	{
+		iso = config_json.iso->valuedouble;
+		//LOG("iso: %f", iso);
+	}
+	else
+	{
+		LOG("missing param: iso.");
+	}
+
+	config_json.dark_related_mask = cJSON_GetObjectItem(config_json.root, "dark_related_mask");
+	if (config_json.dark_related_mask != NULL && cJSON_IsNumber(config_json.dark_related_mask))
+	{
+		dark_related_mask = config_json.dark_related_mask->valueint;
+		//LOG("dark_related_mask: %d", dark_related_mask);
+	}
+	else
+	{
+		LOG("missing param: dark_related_mask.");
+	}
+
+	config_json.dark_fixed_mask = cJSON_GetObjectItem(config_json.root, "dark_fixed_mask");
+	if (config_json.dark_fixed_mask != NULL && cJSON_IsNumber(config_json.dark_fixed_mask))
+	{
+		dark_fixed_mask = config_json.dark_fixed_mask->valueint;
+		//LOG("dark_fixed_mask: %d", dark_fixed_mask);
+	}
+	else
+	{
+		LOG("missing param: dark_fixed_mask.");
+	}
+
+	config_json.light_ratio = cJSON_GetObjectItem(config_json.root, "light_ratio");
+	if (config_json.light_ratio != NULL && cJSON_IsNumber(config_json.light_ratio))
+	{
+		light_ratio = config_json.light_ratio->valuedouble;
+		//LOG("light_ratio: %f", light_ratio);
+	}
+	else
+	{
+		LOG("missing param: light_ratio.");
+	}
+
+	config_json.omega = cJSON_GetObjectItem(config_json.root, "omega");
+	if (config_json.omega != NULL && cJSON_IsNumber(config_json.omega))
+	{
+		omega = config_json.omega->valuedouble;
+		//LOG("omega: %f", omega);
+	}
+	else
+	{
+		LOG("missing param: omega.");
+	}
+
+	config_json.kernel_size = cJSON_GetObjectItem(config_json.root, "kernel_size");
+	if (config_json.kernel_size != NULL && cJSON_IsNumber(config_json.kernel_size))
+	{
+		kernel_size = config_json.kernel_size->valueint;
+		//LOG("kernel_size: %d", kernel_size);
+	}
+	else
+	{
+		LOG("missing param: kernel_size.");
+	}
+
+	config_json.sigma = cJSON_GetObjectItem(config_json.root, "sigma");
+	if (config_json.sigma != NULL && cJSON_IsNumber(config_json.sigma))
+	{
+		sigma = config_json.sigma->valueint;
+		//LOG("sigma: %d", sigma);
+	}
+	else
+	{
+		LOG("missing param: sigma.");
+	}
+
+	config_json.diff_thd0 = cJSON_GetObjectItem(config_json.root, "diff_thd0");
+	diff_thd0 = config_json.diff_thd0->valueint;
+	//LOG("diff_thd0: %d", diff_thd0);
+
+	config_json.diff_thd1 = cJSON_GetObjectItem(config_json.root, "diff_thd1");
+	diff_thd1 = config_json.diff_thd1->valueint;
+	//LOG("diff_thd1: %d", diff_thd1);
+
+	config_json.wgt_dark = cJSON_GetObjectItem(config_json.root, "wgt_dark");
+	array_size = cJSON_GetArraySize(config_json.wgt_dark);
+	wgt_size = array_size;
+	wgt_dark = (S32*)malloc(array_size * sizeof(S32));
+	for (i = 0; i < array_size; i++)
+	{
+		item = cJSON_GetArrayItem(config_json.wgt_dark, i);
+		if (item != NULL && cJSON_IsNumber(item))
+		{
+			wgt_dark[i] = item->valueint;
+			//LOG("wgt_dark[%d]: %d", i, wgt_dark[i]);
+		}
+	}
+
+	config_json.wgt_str = cJSON_GetObjectItem(config_json.root, "wgt_str");
+	array_size = cJSON_GetArraySize(config_json.wgt_str);
+	wgt_str = (S32*)malloc(array_size * sizeof(S32));
+	for (i = 0; i < array_size; i++)
+	{
+		item = cJSON_GetArrayItem(config_json.wgt_str, i);
+		if (item != NULL && cJSON_IsNumber(item))
+		{
+			wgt_str[i] = item->valueint;
+			//LOG("wgt_str[%d]: %d", i, wgt_str[i]);
+		}
+	}
+
+
 }

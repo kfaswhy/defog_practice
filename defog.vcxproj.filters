@@ -18,13 +18,22 @@
     <ClCompile Include="defog.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="cJSON.c">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="defog.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="cJSON.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile" />
+    <None Include="setting.config">
+      <Filter>资源文件</Filter>
+    </None>
   </ItemGroup>
 </Project>

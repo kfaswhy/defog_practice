@@ -4,6 +4,7 @@
 #include <iostream>
 #include <windows.h> 
 #include <time.h>
+#include "cJSON.h"
 
 #define U32 unsigned int
 #define S32 int
@@ -26,6 +27,9 @@ U32 start = clock();
 U32 end;
 U8 prog_print = 1;
 
+U32 t0;
+U32 t1;
+
 typedef struct _RGB
 {
 	BYTE b;
@@ -40,6 +44,24 @@ typedef struct
 	BYTE r;
 	BYTE a;
 }RGBA;
+
+/* Ω‚ŒˆJSON∏Ò Ω */
+typedef struct _CONFIG_JSON
+{
+	cJSON* root;
+
+	cJSON* iso;
+	cJSON* dark_related_mask;
+	cJSON* dark_fixed_mask;
+	cJSON* light_ratio;
+	cJSON* omega;
+	cJSON* kernel_size;
+	cJSON* sigma;
+	cJSON* diff_thd0;
+	cJSON* diff_thd1;
+	cJSON* wgt_dark;
+	cJSON* wgt_str;
+}CONFIG_JSON;
 
 
 int main();
@@ -64,13 +86,15 @@ float calc_Interpolation(int x0, int x1, int y0, int y1, int x);
 int calc_gauss_filtered(RGB* img);
 
 int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light);
-void recover_img(RGB* img, RGB* img_rec, RGB* img_dark, float* trans, RGB light);
+void recover_img(RGB* img, RGB* img_rec, float* trans, RGB light);
 
 int img_process(RGB* img);
 
 RGB* load_bmp(const char* filename);
 
 void save_bmp(const char* filename, RGB* img);
+
+S32 load_cfg(const char* filename);
 
 
 #endif

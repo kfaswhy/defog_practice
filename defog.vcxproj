@@ -127,13 +127,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="cJSON.c" />
     <ClCompile Include="defog.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cJSON.h" />
     <ClInclude Include="defog.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile" />
+    <None Include="setting.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
