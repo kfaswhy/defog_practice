@@ -7,25 +7,34 @@ int width = 0;
 int PaddingSize = 0;
 BYTE* pad = NULL;
 
+//总增益
+float iso = 1.3;
 
 //暗通道过滤参数
 U32 dark_related_mask = 0;//暗通道最小值过滤：相对mask尺寸，若为0则使用固定大小
 U32 dark_fixed_mask = 5; //暗通道最小值过滤：固定mask大小
 
 //大气光计算
-float light_ratio = 0.9;//大气光缩放
+float light_ratio = 1.0;//大气光缩放
 
 //透射系数
-float omega = 0.8; //去雾强度
-int kernel_size = 9; //透射系数高斯卷积：核大小，0表示不做滤波
+float omega = 0.5; //去雾强度
+int kernel_size = 5; //透射系数高斯卷积：核大小，0表示不做滤波
 float sigma = 111; //透射系数高斯卷积：方差
 int diff_thd0 = 100; // 透射系数高斯卷积：邻像素差高于此值时，权重为0；
 int diff_thd1 = 30; // 透射系数高斯卷积：邻像素差低于此值时，权重为1；
- 
+
+//恢复图像
+S32 wgt_dark[] = { 
+	0,30,40,50,70,100,150,
+	190,215,240,250 };
+S32 wgt_str[] = { 
+	40,50,70,80,90,100,70,
+	70,70,70,70 };
+
 int main()
 {
 	char bmp_in[] = "C:/Work/Desktop/1.bmp";
-	char bmp_out[] = "C:/Work/Desktop/1_out.bmp";
 	RGB* img = NULL;
 
 	img = load_bmp(bmp_in);
@@ -36,6 +45,8 @@ int main()
 
 int img_process(RGB* img)
 {
+
+	img_gain(img);
 
 	//计算暗通道
 	RGB* img_dark = (RGB*)malloc(sizeof(RGB) * height * width);
@@ -59,19 +70,18 @@ int img_process(RGB* img)
 
 	//估算透射系数
 	float* trans = (float*)malloc(sizeof(float) * height * width);
-	calc_trans(img, trans, light);
+	calc_trans(img, trans, img_dark, light);
 
 
 	//恢复图像
 	RGB* img_rec = (RGB*)malloc(sizeof(RGB) * height * width);
-	recover_img(img, img_rec, trans, light);
+	recover_img(img, img_rec, img_dark, trans, light);
 	char bmp_recover[] = "C:/Work/Desktop/6_recover.bmp";
 	save_bmp(bmp_recover, img_rec);
 
 
 	return 0;
 }
-
 
 RGB calc_atmos_light(RGB* img, RGB* img_dark)
 {
@@ -117,7 +127,6 @@ RGB calc_atmos_light(RGB* img, RGB* img_dark)
 	return light;
 }
 
-
 void print_prog(U32 cur_pos, U32 tgt)
 {
 	end = clock();
@@ -129,15 +138,15 @@ void print_prog(U32 cur_pos, U32 tgt)
 	}
 }
 
-int img_darken(RGB* img)
+int img_gain(RGB* img)
 {
 	for (int i = 0; i < height; i++) {
 		for (int j = 0; j < width; j++) {
 			int index = i * width + j;
 			/* 像素运算 */
-			img[index].r = img[index].r >> 1;
-			img[index].g = img[index].g >> 0;
-			img[index].b = img[index].b >> 1;
+			img[index].r = clp_range(0, img[index].r * iso, U8MAX);
+			img[index].g = clp_range(0, img[index].g * iso, U8MAX);
+			img[index].b = clp_range(0, img[index].b * iso, U8MAX);
 
 
 			/* 像素运算结束 */
@@ -254,6 +263,31 @@ void create_gaussian_kernel(float* kernel, int kernel_size, float sigma) {
 	}
 }
 
+S32 calc_interpolation_array(S32* array_x, S32* array_y, S32 size, S32 x) 
+{	
+	if (x <= array_x[0]) {
+		return array_y[0];
+	}
+	if (x >= array_x[size - 1]) {
+		return array_y[size - 1];
+	}
+	for (U32 i = 0; i < size - 1; ++i) {
+		if (x == array_x[i]) {
+			return array_y[i];
+		}
+		if (x > array_x[i] && x < array_x[i + 1]) {
+			S32 x0 = array_x[i];
+			S32 x1 = array_x[i + 1];
+			S32 y0 = array_y[i];
+			S32 y1 = array_y[i + 1];
+			return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+		}
+	}
+
+	// This should not be reached if input x is within the bounds
+	return array_y[0];
+}
+
 float calc_Interpolation(int x0, int x1, int y0, int y1, int x)
 {
 	if (x <= x0)
@@ -355,7 +389,7 @@ int calc_gauss_filtered(RGB* img)
 	return 0; // Success
 }
 
-int calc_trans(RGB* img, float* trans, RGB light)
+int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 {
 	float tmp = 0.0;
 	for (int y = 0; y < height; y++) 
@@ -372,7 +406,8 @@ int calc_trans(RGB* img, float* trans, RGB light)
 			tmp = (float)cur->b / calc_max(light.b, 1);
 			trans_tmp = calc_min(trans_tmp, tmp);
 
-			trans_tmp = 1.0 - omega * trans_tmp;
+			float defog_str = (float)calc_interpolation_array(wgt_dark, wgt_str, sizeof(wgt_dark) / sizeof(S32), img_dark[index].r) / 100;
+			trans_tmp = 1.0 - clp_range(0, omega * defog_str, 1)*trans_tmp;
 			//trans_tmp *= 255;
 
 			trans[index]= trans_tmp;
@@ -413,25 +448,25 @@ int calc_trans(RGB* img, float* trans, RGB light)
 	return 0;
 }
 
-void recover_img(RGB* img, RGB* img_rec, float* trans, RGB light)
+void recover_img(RGB* img, RGB* img_rec, RGB* img_dark, float* trans, RGB light)
 {
 	for (int y = 0; y < height; y++)
 	{
 		for (int x = 0; x < width; x++)
 		{
 			U32 index = y * width + x;
+			float defog_str = 0.0;
+
+			//defog_str = (float)calc_interpolation_array(wgt_dark, wgt_str, sizeof(wgt_dark) / sizeof(S32), img_dark[index].r) / 100;
+		
 			float t = calc_min(calc_max(trans[index], 0.001), 1);
-
-			img[index].r = calc_max(img[index].r - light.r * (1 - t),0);
-
-
+			img[index].r = calc_max(img[index].r - light.r * (1 - t), 0);
 			img_rec[index].r = (BYTE)clp_range(0, (float)img[index].r / t, U8MAX);
-			img[index].g = calc_max(img[index].g - light.g * (1 - t), 0);
-
-
+			
+			img[index].g = calc_max(img[index].g - light.g * (1 - t) , 0);
 			img_rec[index].g = (BYTE)clp_range(0, (float)img[index].g / t, U8MAX);
-			img[index].b = calc_max(img[index].b - light.b * (1 - t), 0);
-
+			
+			img[index].b = calc_max(img[index].b - light.b * (1 - t) , 0);
 			img_rec[index].b = (BYTE)clp_range(0, (float)img[index].b / t, U8MAX);
 
 			/*if (x == 0)

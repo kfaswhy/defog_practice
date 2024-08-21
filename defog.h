@@ -6,6 +6,7 @@
 #include <time.h>
 
 #define U32 unsigned int
+#define S32 int
 #define U16 unsigned short
 #define U8 unsigned char 
 #define U8MAX (255)
@@ -45,9 +46,10 @@ int main();
 
 void print_prog(U32 cur_pos, U32 tgt);
 
+int img_gain(RGB* img);
+
 RGB calc_atmos_light(RGB* img, RGB* img_dark);
 
-int img_darken(RGB* img);
 
 int calc_dark_chanel(RGB* img, RGB* img_dark);
 
@@ -55,13 +57,14 @@ int calc_min_filtered(RGB* img);
 
 void create_gaussian_kernel(float* kernel, int kernel_size, float sigma);
 
+S32 calc_interpolation_array(S32* array_x, S32* array_y, S32 size, S32 x);
+
 float calc_Interpolation(int x0, int x1, int y0, int y1, int x);
 
 int calc_gauss_filtered(RGB* img);
 
-int calc_trans(RGB* img, float* trans, RGB light);
-
-void recover_img(RGB* img, RGB* img_rec, float* trans, RGB light);
+int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light);
+void recover_img(RGB* img, RGB* img_rec, RGB* img_dark, float* trans, RGB light);
 
 int img_process(RGB* img);
 
