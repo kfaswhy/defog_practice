@@ -6,6 +6,7 @@
 #include <time.h>
 #include "cJSON.h"
 
+#define U64 unsigned long long
 #define U32 unsigned int
 #define S32 int
 #define U16 unsigned short

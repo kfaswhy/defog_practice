@@ -63,6 +63,7 @@ int img_process(RGB* img)
 
 	//暗通道最小值滤波
 	calc_min_filtered(img_dark);
+	//calc_min_filtered(img_dark);
 	char bmp_dark_filtered[] = "C:/Work/Desktop/3_dark_filtered.bmp";
 	save_bmp(bmp_dark_filtered, img_dark);
 
@@ -230,9 +231,9 @@ int calc_min_filtered(RGB* img)
 				for (int kx = -half_mask; kx <= half_mask; kx++) {
 					int yy = y + ky;
 					int xx = x + kx;
-					U8 r = calc_abs(kx)+ calc_abs(ky);
+					//U8 r = calc_abs(kx) + calc_abs(ky);
 					//double r = 0;
-					if (r < half_mask && yy >= 0 && yy < height && xx >= 0 && xx < width)
+					if (calc_abs(kx) < half_mask && calc_abs(ky) < half_mask && yy >= 0 && yy < height && xx >= 0 && xx < width)
 					{
 						int index = yy * width + xx;
 						rgb_min = calc_min(rgb_min, img[index].r);
@@ -367,8 +368,8 @@ int calc_gauss_filtered(RGB* img)
 
 	for (y = 0; y < height; y++) {
 		for (x = 0; x < width; x++) {
-			float r_sum = 0.0f, g_sum = 0.0f, b_sum = 0.0f;
-			float weight_sum = 0;
+			U64 r_sum = 0, g_sum = 0, b_sum = 0;
+			U64 weight_sum = 0;
 			RGB *center = &img[y * width + x];
 			for (i = -half_size; i <= half_size; i++) {
 				for (j = -half_size; j <= half_size; j++) {
@@ -384,26 +385,27 @@ int calc_gauss_filtered(RGB* img)
 
 					U32 sum = calc_distance(center, pixel);
 
-					float diff = fast_sqrt((float)sum);
+					
 
 					const U32 thd1 = diff_thd1 * diff_thd1;
 					const U32 thd0 = diff_thd0 * diff_thd0;
 
-					float ratio = 0.0;
+					U8 ratio = 0;
 					if (sum <= thd1)
 					{
-						ratio = 1.0;
+						ratio = 100;
 					}
 					else if (sum >= thd0)
 					{
-						ratio = 0.0;
+						ratio = 0;
 					}
 					else 
 					{
-						ratio = calc_Interpolation(diff_thd1, diff_thd0, 1, 0, diff);
+						float diff = fast_sqrt((float)sum); 
+						ratio = calc_Interpolation(diff_thd1, diff_thd0, 100, 0, diff);
 					}
 
-					float weight = ratio;
+					U32 weight = ratio;
 					weight_sum += weight;
 					r_sum += pixel->r * weight;
 					g_sum += pixel->g * weight;
@@ -465,6 +467,7 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 	char bmp_trans_dump[] = "C:/Work/Desktop/4_trans_dump.bmp";
 	save_bmp(bmp_trans_dump, trans_dump);
 
+	calc_gauss_filtered(trans_dump);
 	calc_gauss_filtered(trans_dump);
 
 	char bmp_trans_gauss[] = "C:/Work/Desktop/5_trans_gauss.bmp";
