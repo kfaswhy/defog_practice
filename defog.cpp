@@ -160,6 +160,21 @@ int img_gain(RGB* img)
 	return 0;
 }
 
+float fast_sqrt(float number) {
+	long i;
+	float x2, y;
+	const float threehalfs = 1.5F;
+
+	x2 = number * 0.5F;
+	y = number;
+	i = *(long*)&y;                       // 将 float 解释为 long 类型
+	i = 0x5f3759df - (i >> 1);            // 魔术数字
+	y = *(float*)&i;
+	y = y * (threehalfs - (x2 * y * y));  // 近似值调整
+
+	return 1.0f / y;
+}
+
 int calc_dark_chanel(RGB* img, RGB* img_dark)
 {
 	for (int i = 0; i < height; i++) {
@@ -215,7 +230,7 @@ int calc_min_filtered(RGB* img)
 				for (int kx = -half_mask; kx <= half_mask; kx++) {
 					int yy = y + ky;
 					int xx = x + kx;
-					double r = sqrt(kx * kx + ky * ky);
+					U8 r = calc_abs(kx)+ calc_abs(ky);
 					//double r = 0;
 					if (r < half_mask && yy >= 0 && yy < height && xx >= 0 && xx < width)
 					{
@@ -309,32 +324,19 @@ float calc_Interpolation(int x0, int x1, int y0, int y1, int x)
 	}
 }
 
-float calc_distance(RGB* p1, RGB* p2)
+U32 calc_distance(RGB* p1, RGB* p2)
 {
 	U16 tmp = 0;
-	U16 sum = 0;
+	U32 sum = 0;
 	float diff = 0;
-	float diff_fast = 0;
+
 	U16 d_r = calc_abs((p1->r - p2->r));
 	sum += (d_r * d_r);
 	U16 d_g = calc_abs((p1->g - p2->g));
 	sum += (d_g * d_g);
 	U16 d_b = calc_abs((p1->b - p2->b));
 	sum += (d_b * d_b);
-	diff = sqrt((float)sum);
-	//U16 sum_gb = d_g * d_g + d_b * d_b;
-	//U16 sum_r = d_r * d_r;
-
-	//if (sum_gb >= sum_r)
-	//{
-	//	diff_fast = (float)sum_gb * 0.96 + 0.4 * sum_r;
-	//}
-	//else
-	//{
-	//	diff_fast = (float)sum_r + 0.4 * sum_gb;
-	//}
-	//
-
+	//diff = fast_sqrt((float)sum);
 
 	//if (sum != 0)
 	//{
@@ -342,7 +344,7 @@ float calc_distance(RGB* p1, RGB* p2)
 	//		p1->r, p1->g, p1->b, \
 	//		p2->r, p2->g, p2->b, sum,diff, diff_fast);
 	//}
-	return diff;
+	return sum;
 }
 
 int calc_gauss_filtered(RGB* img)
@@ -361,7 +363,7 @@ int calc_gauss_filtered(RGB* img)
 	if (!kernel) {
 		return -1; // Memory allocation failure
 	}
-	create_gaussian_kernel(kernel, kernel_size, sigma);
+	//create_gaussian_kernel(kernel, kernel_size, sigma);
 
 	for (y = 0; y < height; y++) {
 		for (x = 0; x < width; x++) {
@@ -380,13 +382,28 @@ int calc_gauss_filtered(RGB* img)
 
 					RGB* pixel = &img[y_offset * width + x_offset];
 
-					float diff = calc_distance(center, pixel);
-					float ratio = calc_Interpolation(diff_thd1, diff_thd0, 1, 0, diff);
-					if (ratio < 0.5)
+					U32 sum = calc_distance(center, pixel);
+
+					float diff = fast_sqrt((float)sum);
+
+					const U32 thd1 = diff_thd1 * diff_thd1;
+					const U32 thd0 = diff_thd0 * diff_thd0;
+
+					float ratio = 0.0;
+					if (sum <= thd1)
 					{
-						//LOG("ratio = %f.", ratio);
+						ratio = 1.0;
 					}
-					float weight = kernel[(i + half_size) * kernel_size + (j + half_size)] * ratio;
+					else if (sum >= thd0)
+					{
+						ratio = 0.0;
+					}
+					else 
+					{
+						ratio = calc_Interpolation(diff_thd1, diff_thd0, 1, 0, diff);
+					}
+
+					float weight = ratio;
 					weight_sum += weight;
 					r_sum += pixel->r * weight;
 					g_sum += pixel->g * weight;
