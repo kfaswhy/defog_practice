@@ -53,7 +53,7 @@ int main()
 int img_process(RGB* img)
 {
 
-	img_gain(img);
+	//img_gain(img);
 
 	//计算暗通道
 	RGB* img_dark = (RGB*)malloc(sizeof(RGB) * height * width);
@@ -498,15 +498,17 @@ void recover_img(RGB* img, RGB* img_rec, float* trans, RGB light)
 
 			//defog_str = (float)calc_interpolation_array(wgt_dark, wgt_str, sizeof(wgt_dark) / sizeof(S32), img_dark[index].r) / 100;
 		
+			U32 tmp = 0;
+
 			float t = calc_min(calc_max(trans[index], 0.001), 1);
-			img[index].r = calc_max(img[index].r - light.r * (1 - t), 0);
-			img_rec[index].r = (BYTE)clp_range(0, (float)img[index].r / t, U8MAX);
+			tmp = calc_max(img[index].r * iso - light.r * (1 - t), 0);
+			img_rec[index].r = (BYTE)clp_range(0, (float)tmp / t, U8MAX);
 			
-			img[index].g = calc_max(img[index].g - light.g * (1 - t) , 0);
-			img_rec[index].g = (BYTE)clp_range(0, (float)img[index].g / t, U8MAX);
+			tmp = calc_max(img[index].g * iso - light.g * (1 - t), 0);
+			img_rec[index].g = (BYTE)clp_range(0, (float)tmp / t, U8MAX);
 			
-			img[index].b = calc_max(img[index].b - light.b * (1 - t) , 0);
-			img_rec[index].b = (BYTE)clp_range(0, (float)img[index].b / t, U8MAX);
+			tmp = calc_max(img[index].b * iso - light.b * (1 - t), 0);
+			img_rec[index].b = (BYTE)clp_range(0, (float)tmp / t, U8MAX);
 
 			/*if (x == 0)
 			{
