@@ -24,10 +24,20 @@ float sigma = 111; //透射系数高斯卷积：方差
 int diff_thd0 = 100; // 透射系数高斯卷积：邻像素差高于此值时，权重为0；
 int diff_thd1 = 30; // 透射系数高斯卷积：邻像素差低于此值时，权重为1；
 
+
+
 //恢复图像
 S32 wgt_size = 0;
 S32 *wgt_dark = NULL;
 S32 *wgt_str = NULL;
+
+S32 value_size = 0;
+S32* value = NULL;
+S32* value_str = NULL;
+
+S32 sat_size = 0;
+S32* sat = NULL;
+S32* sat_str = NULL;
 
 int main()
 {
@@ -84,8 +94,13 @@ int img_process(RGB* img)
 	//恢复图像
 	RGB* img_rec = (RGB*)malloc(sizeof(RGB) * height * width);
 	recover_img(img, img_rec, trans, light);
+
 	char bmp_recover[] = "C:/Work/Desktop/6_recover.bmp";
 	save_bmp(bmp_recover, img_rec);
+	//调整饱和度
+	set_color(img_rec);
+	char bmp_color[] = "C:/Work/Desktop/7_color.bmp";
+	save_bmp(bmp_color, img_rec);
 
 
 	return 0;
@@ -99,7 +114,7 @@ RGB calc_atmos_light(RGB* img, RGB* img_dark)
 	U8 max_rgb = 0;
 	float ratio = 0;
 	RGB light = { 0 };
-	for (int i = 0; i < height; i++)
+	for (int i = height*2 / 3; i < height; i++)
 	{
 		for (int j = 0; j < width; j++)
 		{
@@ -158,6 +173,110 @@ int img_gain(RGB* img)
 			/* 像素运算结束 */
 		}
 	}
+	return 0;
+}
+
+HSV rgb2hsv(RGB rgb)
+{
+	HSV hsv = { 0 };
+	double rd, gd, bd;
+	double max, min, delta;
+
+	rd = rgb.r / 255.0;
+	gd = rgb.g / 255.0;
+	bd = rgb.b / 255.0;
+
+	max = fmax(fmax(rd, gd), bd);
+	min = fmin(fmin(rd, gd), bd);
+	delta = max - min;
+
+	// 计算V值 (明度)
+	hsv.v = max;
+
+	// 计算S值 (饱和度)
+	if (max == 0) {
+		hsv.s = 0;
+	}
+	else {
+		hsv.s = delta / max;
+	}
+
+	// 计算H值 (色相)
+	if (delta == 0) {
+		hsv.h = 0; // 当delta为0时，无色相
+	}
+	else {
+		if (max == rd) {
+			hsv.h = 60 * fmod(((gd - bd) / delta), 6);
+		}
+		else if (max == gd) {
+			hsv.h = 60 * (((bd - rd) / delta) + 2);
+		}
+		else if (max == bd) {
+			hsv.h = 60 * (((rd - gd) / delta) + 4);
+		}
+
+		if (hsv.h < 0) {
+			hsv.h += 360;
+		}
+	}
+
+	//printf("RGB(%d, %d, %d) -> HSV(%.2f, %.2f, %.2f)\n", rgb.r, rgb.g, rgb.b, hsv.h, hsv.s, hsv.v);
+	return hsv;
+}
+
+RGB hsv2rgb(HSV hsv)
+{
+	RGB rgb = { 0 };
+	double c = hsv.v * hsv.s;
+	double x = c * (1 - fabs(fmod(hsv.h / 60.0, 2) - 1));
+	double m = hsv.v - c;
+	double r_, g_, b_;
+
+	if (hsv.h >= 0 && hsv.h < 60) {
+		r_ = c, g_ = x, b_ = 0;
+	}
+	else if (hsv.h >= 60 && hsv.h < 120) {
+		r_ = x, g_ = c, b_ = 0;
+	}
+	else if (hsv.h >= 120 && hsv.h < 180) {
+		r_ = 0, g_ = c, b_ = x;
+	}
+	else if (hsv.h >= 180 && hsv.h < 240) {
+		r_ = 0, g_ = x, b_ = c;
+	}
+	else if (hsv.h >= 240 && hsv.h < 300) {
+		r_ = x, g_ = 0, b_ = c;
+	}
+	else {
+		r_ = c, g_ = 0, b_ = x;
+	}
+
+	rgb.r = (unsigned char)((r_ + m) * 255);
+	rgb.g = (unsigned char)((g_ + m) * 255);
+	rgb.b = (unsigned char)((b_ + m) * 255);
+
+	return rgb;
+}
+
+int set_color(RGB* img) {
+	RGB* p_img = &img[0];
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j < width; j++) {
+			
+			HSV hsv = rgb2hsv(*p_img);
+
+			float v_ratio = (float)calc_interpolation_array(value, value_str, value_size, (int)(hsv.v * 100)) / 100;
+			hsv.v *= v_ratio;
+
+			float s_ratio = (float)calc_interpolation_array(sat, sat_str, sat_size, (int)(hsv.s * 100)) / 100;
+			hsv.s *= s_ratio;
+			
+			*p_img = hsv2rgb(hsv);
+			p_img++;
+		}
+	}
+	LOG("Done.");
 	return 0;
 }
 
@@ -445,7 +564,7 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 			tmp = (float)cur->b / calc_max(light.b, 1);
 			trans_tmp = calc_min(trans_tmp, tmp);
 			float defog_str = (float)calc_interpolation_array(wgt_dark, wgt_str, wgt_size, img_dark[index].r) / 100;
-			trans_tmp = 1.0 - clp_range(0, omega * defog_str, 1)*trans_tmp;
+			trans_tmp = 1.0 - clp_range(0, omega * defog_str, 1) * trans_tmp;
 			//trans_tmp *= 255;
 
 			trans[index]= trans_tmp;
@@ -466,8 +585,9 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 
 	char bmp_trans_dump[] = "C:/Work/Desktop/4_trans_dump.bmp";
 	save_bmp(bmp_trans_dump, trans_dump);
-
-	calc_gauss_filtered(trans_dump);
+	//calc_gauss_filtered(trans_dump);
+	//calc_gauss_filtered(trans_dump);
+	//calc_gauss_filtered(trans_dump);
 	calc_gauss_filtered(trans_dump);
 
 	char bmp_trans_gauss[] = "C:/Work/Desktop/5_trans_gauss.bmp";
@@ -686,6 +806,7 @@ S32 load_cfg(const char* filename)
 	diff_thd1 = config_json.diff_thd1->valueint;
 	//LOG("diff_thd1: %d", diff_thd1);
 
+
 	config_json.wgt_dark = cJSON_GetObjectItem(config_json.root, "wgt_dark");
 	array_size = cJSON_GetArraySize(config_json.wgt_dark);
 	wgt_size = array_size;
@@ -714,4 +835,57 @@ S32 load_cfg(const char* filename)
 	}
 
 
+	config_json.value = cJSON_GetObjectItem(config_json.root, "value");
+	array_size = cJSON_GetArraySize(config_json.value);
+	value_size = array_size;
+	value = (S32*)malloc(array_size * sizeof(S32));
+	for (i = 0; i < array_size; i++)
+	{
+		item = cJSON_GetArrayItem(config_json.value, i);
+		if (item != NULL && cJSON_IsNumber(item))
+		{
+			value[i] = item->valueint;
+			//LOG("value[%d]: %d", i, value[i]);
+		}
+	}
+
+	config_json.value_str = cJSON_GetObjectItem(config_json.root, "value_str");
+	array_size = cJSON_GetArraySize(config_json.value_str);
+	value_str = (S32*)malloc(array_size * sizeof(S32));
+	for (i = 0; i < array_size; i++)
+	{
+		item = cJSON_GetArrayItem(config_json.value_str, i);
+		if (item != NULL && cJSON_IsNumber(item))
+		{
+			value_str[i] = item->valueint;
+			//LOG("value_str[%d]: %d", i, value_str[i]);
+		}
+	}
+
+	config_json.sat = cJSON_GetObjectItem(config_json.root, "sat");
+	array_size = cJSON_GetArraySize(config_json.sat);
+	sat_size = array_size;
+	sat = (S32*)malloc(array_size * sizeof(S32));
+	for (i = 0; i < array_size; i++)
+	{
+		item = cJSON_GetArrayItem(config_json.sat, i);
+		if (item != NULL && cJSON_IsNumber(item))
+		{
+			sat[i] = item->valueint;
+			//LOG("sat[%d]: %d", i, sat[i]);
+		}
+	}
+
+	config_json.sat_str = cJSON_GetObjectItem(config_json.root, "sat_str");
+	array_size = cJSON_GetArraySize(config_json.sat_str);
+	sat_str = (S32*)malloc(array_size * sizeof(S32));
+	for (i = 0; i < array_size; i++)
+	{
+		item = cJSON_GetArrayItem(config_json.sat_str, i);
+		if (item != NULL && cJSON_IsNumber(item))
+		{
+			sat_str[i] = item->valueint;
+			//LOG("sat_str[%d]: %d", i, sat_str[i]);
+		}
+	}
 }
