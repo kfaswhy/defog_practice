@@ -4,6 +4,7 @@
 #include <iostream>
 #include <windows.h> 
 #include <time.h>
+#include <omp.h>
 #include "cJSON.h"
 
 #define U64 unsigned long long
@@ -32,6 +33,15 @@ U8 prog_print = 1;
 U32 t0;
 U32 t1;
 
+typedef enum SAMP_METHOD
+{
+	NEAREST = 0,
+	LINEAR,
+	BILINEAR,
+};
+
+
+
 typedef struct _RGB
 {
 	BYTE b;
@@ -57,7 +67,9 @@ typedef struct
 typedef struct _CONFIG_JSON
 {
 	cJSON* root;
-
+	cJSON* sampling_related_ratio;
+	cJSON* sampling_height;
+	cJSON* sampling_width;
 	cJSON* iso;
 	cJSON* dark_related_mask;
 	cJSON* dark_fixed_mask;
@@ -73,11 +85,14 @@ typedef struct _CONFIG_JSON
 	cJSON* sat_str;
 	cJSON* value;
 	cJSON* value_str;
+	cJSON* color_process;
 
 }CONFIG_JSON;
 
 
 int main();
+
+RGB* img_sampling(RGB* img, int w1, int h1, int w2, int h2, bool method);
 
 void print_prog(U32 cur_pos, U32 tgt);
 
@@ -111,7 +126,7 @@ int img_process(RGB* img);
 
 RGB* load_bmp(const char* filename);
 
-void save_bmp(const char* filename, RGB* img);
+void save_bmp(const char* filename, RGB* img, int width, int height);
 
 S32 load_cfg(const char* filename);
 

@@ -4,8 +4,15 @@ BITMAPFILEHEADER fileHeader;
 BITMAPINFOHEADER infoHeader;
 int height = 0;
 int width = 0;
+
+
 int PaddingSize = 0;
 BYTE* pad = NULL;
+
+//缩放参数
+int sampling_related_ratio = 0; //缩放图像时，若此值不为0，则按比例缩放；若为0，则按下面两个参数缩放
+int h_samp = 0;
+int w_samp = 0;
 
 //总增益
 float iso = 1.3;
@@ -24,7 +31,7 @@ float sigma = 111; //透射系数高斯卷积：方差
 int diff_thd0 = 100; // 透射系数高斯卷积：邻像素差高于此值时，权重为0；
 int diff_thd1 = 30; // 透射系数高斯卷积：邻像素差低于此值时，权重为1；
 
-
+int color_process = 0;
 
 //恢复图像
 S32 wgt_size = 0;
@@ -49,15 +56,95 @@ int main()
 	RGB* img = NULL;
 
 	img = load_bmp(bmp_in);
-	img_process(img);
+	
 	//save_bmp(bmp_out, img);
+
+	if (sampling_related_ratio != 0)
+	{
+		w_samp = width / sampling_related_ratio;
+		h_samp = height / sampling_related_ratio;
+	}
+
+
+	img_process(img);
+
+	////下面是采样测试
+	//RGB* img500 = NULL;
+	//img500 = img_sampling(img, width, height, w_samp, h_samp, LINEAR);
+	//char bmp_500[] = "C:/Work/Desktop/bmp_500.bmp";
+	//save_bmp(bmp_500, img500, w_samp, h_samp);
+
+
+
+
 	t1 = clock();
 
 	U32 d_t = t1 - t0;
 	LOG("sum time = %.3f.", (float)d_t / 1000);
 	return 0;
 }
- 
+
+
+RGB* img_sampling(RGB* img, int w1, int h1, int w2, int h2, bool method) {
+	// 分配新图像的空间
+	RGB* new_img = (RGB*)malloc(w2 * h2 * sizeof(RGB));
+	if (!new_img) return NULL; // 检查内存分配是否成功
+
+	for (int y = 0; y < h2; y++) {
+		for (int x = 0; x < w2; x++) {
+			// 计算在原图像中的位置
+			float src_x = (float)x * w1 / w2;
+			float src_y = (float)y * h1 / h2;
+
+			if (method == 0) { // 邻近值采样
+				int nearest_x = (int)(src_x + 0.5);
+				int nearest_y = (int)(src_y + 0.5);
+
+				// 边界检查
+				if (nearest_x >= w1) nearest_x = w1 - 1;
+				if (nearest_y >= h1) nearest_y = h1 - 1;
+
+				new_img[y * w2 + x] = img[nearest_y * w1 + nearest_x];
+			}
+			else { // 双线性插值
+				int x1 = (int)src_x;
+				int y1 = (int)src_y;
+				int x2 = x1 + 1 < w1 ? x1 + 1 : x1;
+				int y2 = y1 + 1 < h1 ? y1 + 1 : y1;
+
+				float dx = src_x - x1;
+				float dy = src_y - y1;
+
+				RGB p1 = img[y1 * w1 + x1];
+				RGB p2 = img[y1 * w1 + x2];
+				RGB p3 = img[y2 * w1 + x1];
+				RGB p4 = img[y2 * w1 + x2];
+
+				new_img[y * w2 + x].r = (unsigned char)(
+					p1.r * (1 - dx) * (1 - dy) +
+					p2.r * dx * (1 - dy) +
+					p3.r * (1 - dx) * dy +
+					p4.r * dx * dy
+					);
+				new_img[y * w2 + x].g = (unsigned char)(
+					p1.g * (1 - dx) * (1 - dy) +
+					p2.g * dx * (1 - dy) +
+					p3.g * (1 - dx) * dy +
+					p4.g * dx * dy
+					);
+				new_img[y * w2 + x].b = (unsigned char)(
+					p1.b * (1 - dx) * (1 - dy) +
+					p2.b * dx * (1 - dy) +
+					p3.b * (1 - dx) * dy +
+					p4.b * dx * dy
+					);
+			}
+		}
+		print_prog(y, h2);
+	}
+
+	return new_img;
+}
 
 
 int img_process(RGB* img)
@@ -65,17 +152,22 @@ int img_process(RGB* img)
 
 	//img_gain(img);
 
+	//缩放图片
+	RGB* img_samp = NULL;
+	img_samp = img_sampling(img, width, height, w_samp, h_samp, LINEAR);
+	char bmp_samp[] = "C:/Work/Desktop/1_img_samp.bmp";
+	save_bmp(bmp_samp, img_samp, w_samp, h_samp);
+	
 	//计算暗通道
-	RGB* img_dark = (RGB*)malloc(sizeof(RGB) * height * width);
-	calc_dark_chanel(img, img_dark);
+	RGB* img_dark = (RGB*)malloc(sizeof(RGB) * w_samp * h_samp);
+	calc_dark_chanel(img_samp, img_dark);
 	char bmp_dark[] = "C:/Work/Desktop/2_dark.bmp";
-	save_bmp(bmp_dark, img_dark);
+	save_bmp(bmp_dark, img_dark, w_samp, h_samp); 
 
 	//暗通道最小值滤波
 	calc_min_filtered(img_dark);
-	//calc_min_filtered(img_dark);
 	char bmp_dark_filtered[] = "C:/Work/Desktop/3_dark_filtered.bmp";
-	save_bmp(bmp_dark_filtered, img_dark);
+	save_bmp(bmp_dark_filtered, img_dark, w_samp, h_samp);
 
 	//暗通道高斯滤波
 	//calc_gauss_filtered(img_dark);
@@ -83,25 +175,28 @@ int img_process(RGB* img)
 	//save_bmp(bmp_dark_gauss, img_dark);
 
 	//估算大气光
-	RGB light = calc_atmos_light(img, img_dark);
+	RGB light = calc_atmos_light(img_samp, img_dark);
 
 
 	//估算透射系数
 	float* trans = (float*)malloc(sizeof(float) * height * width);
-	calc_trans(img, trans, img_dark, light);
+	calc_trans(img_samp, trans, img_dark, light);
 
 
 	//恢复图像
 	RGB* img_rec = (RGB*)malloc(sizeof(RGB) * height * width);
 	recover_img(img, img_rec, trans, light);
 
-	char bmp_recover[] = "C:/Work/Desktop/6_recover.bmp";
-	save_bmp(bmp_recover, img_rec);
-	//调整饱和度
-	set_color(img_rec);
-	char bmp_color[] = "C:/Work/Desktop/7_color.bmp";
-	save_bmp(bmp_color, img_rec);
+	char bmp_recover[] = "C:/Work/Desktop/7_recover.bmp";
+	save_bmp(bmp_recover, img_rec, width, height);
 
+	if (color_process == 1)
+	{
+		//调整饱和度
+		set_color(img_rec);
+		char bmp_color[] = "C:/Work/Desktop/8_color.bmp";
+		save_bmp(bmp_color, img_rec, width, height);
+	}
 
 	return 0;
 }
@@ -114,11 +209,11 @@ RGB calc_atmos_light(RGB* img, RGB* img_dark)
 	U8 max_rgb = 0;
 	float ratio = 0;
 	RGB light = { 0 };
-	for (int i = height*2 / 3; i < height; i++)
+	for (int i = h_samp * 2 / 3; i < h_samp; i++)
 	{
-		for (int j = 0; j < width; j++)
+		for (int j = 0; j < w_samp; j++)
 		{
-			int index = i * width + j;
+			int index = i * w_samp + j;
 			if (img_dark[index].r > max_dark)
 			{
 				max_i = i;
@@ -128,7 +223,7 @@ RGB calc_atmos_light(RGB* img, RGB* img_dark)
 		}
 	}
 
-	int index = max_i * width + max_j;
+	int index = max_i * w_samp + max_j;
 
 	max_rgb = calc_max(max_rgb, img[index].r);
 	max_rgb = calc_max(max_rgb, img[index].g);
@@ -143,7 +238,7 @@ RGB calc_atmos_light(RGB* img, RGB* img_dark)
 	light.b = img[index].b * ratio;
 
 	LOG("pos=[%d,%d], max_dark=%u, light=[%u,%u,%u]",
-		height - max_i - 1, max_j, max_dark, light.r, light.g, light.b);
+		h_samp - max_i - 1, max_j, max_dark, light.r, light.g, light.b);
 
 	return light;
 }
@@ -176,105 +271,84 @@ int img_gain(RGB* img)
 	return 0;
 }
 
-HSV rgb2hsv(RGB rgb)
-{
-	HSV hsv = { 0 };
-	double rd, gd, bd;
-	double max, min, delta;
+HSV rgb2hsv(RGB rgb) {
+	int r = rgb.r;
+	int g = rgb.g;
+	int b = rgb.b;
 
-	rd = rgb.r / 255.0;
-	gd = rgb.g / 255.0;
-	bd = rgb.b / 255.0;
+	int max = r > g ? (r > b ? r : b) : (g > b ? g : b);
+	int min = r < g ? (r < b ? r : b) : (g < b ? g : b);
+	int delta = max - min;
 
-	max = fmax(fmax(rd, gd), bd);
-	min = fmin(fmin(rd, gd), bd);
-	delta = max - min;
+	HSV hsv;
+	hsv.v = max / 255.0;
 
-	// 计算V值 (明度)
-	hsv.v = max;
-
-	// 计算S值 (饱和度)
-	if (max == 0) {
-		hsv.s = 0;
-	}
-	else {
-		hsv.s = delta / max;
-	}
-
-	// 计算H值 (色相)
 	if (delta == 0) {
-		hsv.h = 0; // 当delta为0时，无色相
+		hsv.h = 0;
+		hsv.s = 0;
+		return hsv;
+	}
+
+	hsv.s = (float)delta / max;
+
+	if (r == max) {
+		hsv.h = 60 * ((g - b) / (float)delta);
+	}
+	else if (g == max) {
+		hsv.h = 60 * (2 + (b - r) / (float)delta);
 	}
 	else {
-		if (max == rd) {
-			hsv.h = 60 * fmod(((gd - bd) / delta), 6);
-		}
-		else if (max == gd) {
-			hsv.h = 60 * (((bd - rd) / delta) + 2);
-		}
-		else if (max == bd) {
-			hsv.h = 60 * (((rd - gd) / delta) + 4);
-		}
-
-		if (hsv.h < 0) {
-			hsv.h += 360;
-		}
+		hsv.h = 60 * (4 + (r - g) / (float)delta);
 	}
 
-	//printf("RGB(%d, %d, %d) -> HSV(%.2f, %.2f, %.2f)\n", rgb.r, rgb.g, rgb.b, hsv.h, hsv.s, hsv.v);
+	if (hsv.h < 0) {
+		hsv.h += 360;
+	}
+
 	return hsv;
 }
+
 
 RGB hsv2rgb(HSV hsv)
 {
 	RGB rgb = { 0 };
-	double c = hsv.v * hsv.s;
-	double x = c * (1 - fabs(fmod(hsv.h / 60.0, 2) - 1));
-	double m = hsv.v - c;
-	double r_, g_, b_;
+	int h = (int)(hsv.h / 60) % 6;
+	double f = hsv.h / 60.0 - h;
+	double p = hsv.v * (1 - hsv.s);
+	double q = hsv.v * (1 - f * hsv.s);
+	double t = hsv.v * (1 - (1 - f) * hsv.s);
 
-	if (hsv.h >= 0 && hsv.h < 60) {
-		r_ = c, g_ = x, b_ = 0;
+	switch (h) {
+	case 0: rgb.r = hsv.v * 255; rgb.g = t * 255; rgb.b = p * 255; break;
+	case 1: rgb.r = q * 255; rgb.g = hsv.v * 255; rgb.b = p * 255; break;
+	case 2: rgb.r = p * 255; rgb.g = hsv.v * 255; rgb.b = t * 255; break;
+	case 3: rgb.r = p * 255; rgb.g = q * 255; rgb.b = hsv.v * 255; break;
+	case 4: rgb.r = t * 255; rgb.g = p * 255; rgb.b = hsv.v * 255; break;
+	case 5: rgb.r = hsv.v * 255; rgb.g = p * 255; rgb.b = q * 255; break;
 	}
-	else if (hsv.h >= 60 && hsv.h < 120) {
-		r_ = x, g_ = c, b_ = 0;
-	}
-	else if (hsv.h >= 120 && hsv.h < 180) {
-		r_ = 0, g_ = c, b_ = x;
-	}
-	else if (hsv.h >= 180 && hsv.h < 240) {
-		r_ = 0, g_ = x, b_ = c;
-	}
-	else if (hsv.h >= 240 && hsv.h < 300) {
-		r_ = x, g_ = 0, b_ = c;
-	}
-	else {
-		r_ = c, g_ = 0, b_ = x;
-	}
-
-	rgb.r = (unsigned char)((r_ + m) * 255);
-	rgb.g = (unsigned char)((g_ + m) * 255);
-	rgb.b = (unsigned char)((b_ + m) * 255);
 
 	return rgb;
 }
 
+
 int set_color(RGB* img) {
 	RGB* p_img = &img[0];
 	for (int i = 0; i < height; i++) {
+#pragma omp parallel
 		for (int j = 0; j < width; j++) {
 			
 			HSV hsv = rgb2hsv(*p_img);
 
-			float v_ratio = (float)calc_interpolation_array(value, value_str, value_size, (int)(hsv.v * 100)) / 100;
-			hsv.v *= v_ratio;
+			int v_ratio = calc_interpolation_array(value, value_str, value_size, (int)(hsv.v * 100));
+			hsv.v = hsv.v * v_ratio / 100;
 
-			float s_ratio = (float)calc_interpolation_array(sat, sat_str, sat_size, (int)(hsv.s * 100)) / 100;
-			hsv.s *= s_ratio;
+			int s_ratio = calc_interpolation_array(sat, sat_str, sat_size, (int)(hsv.s * 100));
+			hsv.s = hsv.s * s_ratio / 100;
 			
 			*p_img = hsv2rgb(hsv);
 			p_img++;
 		}
+		print_prog(i, height);
 	}
 	LOG("Done.");
 	return 0;
@@ -297,9 +371,9 @@ float fast_sqrt(float number) {
 
 int calc_dark_chanel(RGB* img, RGB* img_dark)
 {
-	for (int i = 0; i < height; i++) {
-		for (int j = 0; j < width; j++) {
-			int index = i * width + j;
+	for (int i = 0; i < h_samp; i++) {
+		for (int j = 0; j < w_samp; j++) {
+			int index = i * w_samp + j;
 			/* 像素运算 */
 			int rgb_min = U8MAX;
 			rgb_min = calc_min(rgb_min, img[index].r);
@@ -338,11 +412,11 @@ int calc_min_filtered(RGB* img)
 
 	int half_mask = mask / 2;
 
-	RGB* filtered = (RGB*)malloc(sizeof(RGB) * height * width);
+	RGB* filtered = (RGB*)malloc(sizeof(RGB) * h_samp * w_samp);
 
 	// 遍历图像中的每个像素
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
+	for (int y = 0; y < h_samp; y++) {
+		for (int x = 0; x < w_samp; x++) {
 			int rgb_min = U8MAX;
 
 			// 遍历滤波掩膜区域
@@ -354,7 +428,7 @@ int calc_min_filtered(RGB* img)
 					//double r = 0;
 					if (calc_abs(kx) < half_mask && calc_abs(ky) < half_mask && yy >= 0 && yy < height && xx >= 0 && xx < width)
 					{
-						int index = yy * width + xx;
+						int index = yy * w_samp + xx;
 						rgb_min = calc_min(rgb_min, img[index].r);
 						rgb_min = calc_max(rgb_min, U8MIN);
 					}
@@ -362,13 +436,13 @@ int calc_min_filtered(RGB* img)
 			}
 
 			// 将最小值存储到过滤后的图像中
-			filtered[y * width + x].r = rgb_min;
-			filtered[y * width + x].g = rgb_min;
-			filtered[y * width + x].b = rgb_min;
+			filtered[y * w_samp + x].r = rgb_min;
+			filtered[y * w_samp + x].g = rgb_min;
+			filtered[y * w_samp + x].b = rgb_min;
 		}
-		print_prog(y, height);
+		print_prog(y, h_samp);
 	}
-	memcpy(img, filtered, sizeof(RGB) * height * width);
+	memcpy(img, filtered, sizeof(RGB) * h_samp * w_samp);
 	free(filtered);
 	LOG("done.");
 
@@ -471,10 +545,10 @@ int calc_gauss_filtered(RGB* img)
 {
 	int x, y, i, j;
 
-	RGB* filtered = (RGB*)malloc(sizeof(RGB) * height * width);
+	RGB* filtered = (RGB*)malloc(sizeof(RGB) * h_samp * w_samp);
 	if (kernel_size == 0)
 	{
-		//memcpy(filtered, img, sizeof(RGB) * height * width);
+		//memcpy(filtered, img, sizeof(RGB) * height * w_samp);
 		return 0;
 	}
 
@@ -485,22 +559,22 @@ int calc_gauss_filtered(RGB* img)
 	}
 	//create_gaussian_kernel(kernel, kernel_size, sigma);
 
-	for (y = 0; y < height; y++) {
-		for (x = 0; x < width; x++) {
+	for (y = 0; y < h_samp; y++) {
+		for (x = 0; x < w_samp; x++) {
 			U64 r_sum = 0, g_sum = 0, b_sum = 0;
 			U64 weight_sum = 0;
-			RGB *center = &img[y * width + x];
+			RGB *center = &img[y * w_samp + x];
 			for (i = -half_size; i <= half_size; i++) {
 				for (j = -half_size; j <= half_size; j++) {
 					int x_offset = x + j;
 					int y_offset = y + i;
 
 					x_offset = calc_max(x_offset, 0);
-					x_offset = calc_min(x_offset, width - 1);
+					x_offset = calc_min(x_offset, w_samp - 1);
 					y_offset = calc_max(y_offset, 0);
-					y_offset = calc_min(y_offset, height - 1);
+					y_offset = calc_min(y_offset, h_samp - 1);
 
-					RGB* pixel = &img[y_offset * width + x_offset];
+					RGB* pixel = &img[y_offset * w_samp + x_offset];
 
 					U32 sum = calc_distance(center, pixel);
 
@@ -532,14 +606,14 @@ int calc_gauss_filtered(RGB* img)
 				}
 			}
 
-			filtered[y * width + x].r = (BYTE)roundf(r_sum / weight_sum);
-			filtered[y * width + x].g = (BYTE)roundf(g_sum / weight_sum);
-			filtered[y * width + x].b = (BYTE)roundf(b_sum / weight_sum);
+			filtered[y * w_samp + x].r = (BYTE)roundf(r_sum / weight_sum);
+			filtered[y * w_samp + x].g = (BYTE)roundf(g_sum / weight_sum);
+			filtered[y * w_samp + x].b = (BYTE)roundf(b_sum / weight_sum);
 		}
-		print_prog(y, height);
+		print_prog(y, h_samp);
 	}
 
-	memcpy(img, filtered, sizeof(RGB) * height * width);
+	memcpy(img, filtered, sizeof(RGB) * h_samp * w_samp);
 
 	free(kernel);
 	free(filtered);
@@ -550,11 +624,13 @@ int calc_gauss_filtered(RGB* img)
 int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 {
 	float tmp = 0.0;
-	for (int y = 0; y < height; y++) 
+	
+	//计算img图的透射率
+	for (int y = 0; y < h_samp; y++) 
 	{
-		for (int x = 0; x < width; x++) 
+		for (int x = 0; x < w_samp; x++)
 		{
-			U32 index = y * width + x;
+			U32 index = y * w_samp + x;
 			float trans_tmp = U8MAX;
 			RGB *cur = &img[index];
 			tmp = (float)cur->r / calc_max(light.r, 1);
@@ -570,13 +646,13 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 			trans[index]= trans_tmp;
 		}
 	}
-
-	RGB* trans_dump = (RGB*)malloc(sizeof(RGB) * height * width);
-	for (int y = 0; y < height; y++)
+	//透射率转为rgb图
+	RGB* trans_dump = (RGB*)malloc(sizeof(RGB) * h_samp * w_samp);
+	for (int y = 0; y < h_samp; y++)
 	{
-		for (int x = 0; x < width; x++)
+		for (int x = 0; x < w_samp; x++)
 		{
-			U32 index = y * width + x;
+			U32 index = y * w_samp + x;
 			trans_dump[index].r = (BYTE)calc_min(calc_max(trans[index] * U8MAX, 0), U8MAX);
 			trans_dump[index].g = trans_dump[index].r;
 			trans_dump[index].b = trans_dump[index].r;
@@ -584,21 +660,31 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 	}
 
 	char bmp_trans_dump[] = "C:/Work/Desktop/4_trans_dump.bmp";
-	save_bmp(bmp_trans_dump, trans_dump);
+	save_bmp(bmp_trans_dump, trans_dump, w_samp, h_samp);
 	//calc_gauss_filtered(trans_dump);
 	//calc_gauss_filtered(trans_dump);
 	//calc_gauss_filtered(trans_dump);
 	calc_gauss_filtered(trans_dump);
 
+
+	//透射率图双边滤波
 	char bmp_trans_gauss[] = "C:/Work/Desktop/5_trans_gauss.bmp";
-	save_bmp(bmp_trans_gauss, trans_dump);
+	save_bmp(bmp_trans_gauss, trans_dump, w_samp, h_samp);
+
+
+	//透射率图放大至原始大小
+	RGB* trans_rec = NULL;
+	trans_rec = img_sampling(trans_dump, w_samp, h_samp, width, height, LINEAR);
+	char bmp_trans_rec[] = "C:/Work/Desktop/6_trans_rec.bmp";
+	save_bmp(bmp_trans_rec, trans_rec, width, height);
+
 
 	for (int y = 0; y < height; y++)
 	{
 		for (int x = 0; x < width; x++)
 		{
 			U32 index = y * width + x;
-			trans[index] = clp_range(0.0, (float)trans_dump[index].r / U8MAX, 1.0);
+			trans[index] = clp_range(0.0, (float)trans_rec[index].r / U8MAX, 1.0);
 		}
 	}
 
@@ -650,6 +736,9 @@ RGB* load_bmp(const char* filename)
 
 	height = infoHeader.biHeight;
 	width = infoHeader.biWidth;
+
+
+
 	int LineByteCnt = (((width * infoHeader.biBitCount) + 31) >> 5) << 2;
 	//int ImageDataSize = LineByteCnt * height;
 	PaddingSize = 4 - ((width * infoHeader.biBitCount) >> 3) & 3;
@@ -678,11 +767,32 @@ RGB* load_bmp(const char* filename)
 	return img;
 }
 
-void save_bmp(const char* filename, RGB* img)
+void save_bmp(const char* filename, RGB* img, int width, int height)
 {
 	FILE* f_out = fopen(filename, "wb");
+
+	fileHeader.bfType = 0x4D42; // 'BM'
+	fileHeader.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+	fileHeader.bfSize = fileHeader.bfOffBits + width * height * sizeof(RGB);
+	fileHeader.bfReserved1 = 0;
+	fileHeader.bfReserved2 = 0;
+
+	infoHeader.biSize = sizeof(BITMAPINFOHEADER);
+	infoHeader.biWidth = width;
+	infoHeader.biHeight = height;
+	infoHeader.biPlanes = 1;
+	infoHeader.biBitCount = 24;
+	infoHeader.biCompression = 0;
+	infoHeader.biSizeImage = width * height * sizeof(RGB);
+	infoHeader.biXPelsPerMeter = 0;
+	infoHeader.biYPelsPerMeter = 0;
+	infoHeader.biClrUsed = 0;
+	infoHeader.biClrImportant = 0;
+
 	fwrite(&fileHeader, sizeof(fileHeader), 1, f_out);
 	fwrite(&infoHeader, sizeof(infoHeader), 1, f_out);
+
+
 	for (int i = 0; i < height; i++) {
 		for (int j = 0; j < width; j++)
 			fwrite(&img[i * width + j], sizeof(RGB), 1, f_out);
@@ -720,6 +830,22 @@ S32 load_cfg(const char* filename)
 		LOG("Config analysis ERROR."); // 如果解析JSON失败，输出错误信息
 		return ERROR;
 	}
+
+	config_json.sampling_related_ratio = cJSON_GetObjectItem(config_json.root, "sampling_related_ratio");
+	sampling_related_ratio = config_json.sampling_related_ratio->valueint;
+	//LOG("sampling_related_ratio: %d", sampling_related_ratio);
+
+	config_json.sampling_height = cJSON_GetObjectItem(config_json.root, "sampling_height");
+	h_samp = config_json.sampling_height->valueint;
+	//LOG("sampling_height: %d", sampling_height);
+
+	config_json.sampling_width = cJSON_GetObjectItem(config_json.root, "sampling_width");
+	w_samp = config_json.sampling_width->valueint;
+	//LOG("sampling_width: %d", sampling_width);
+
+	
+
+
 
 	config_json.iso = cJSON_GetObjectItem(config_json.root, "iso");
 	if (config_json.iso != NULL && cJSON_IsNumber(config_json.iso))
@@ -806,6 +932,10 @@ S32 load_cfg(const char* filename)
 	diff_thd1 = config_json.diff_thd1->valueint;
 	//LOG("diff_thd1: %d", diff_thd1);
 
+
+	config_json.color_process = cJSON_GetObjectItem(config_json.root, "color_process");
+	color_process = config_json.color_process->valueint;
+	//LOG("color_process: %d", color_process);
 
 	config_json.wgt_dark = cJSON_GetObjectItem(config_json.root, "wgt_dark");
 	array_size = cJSON_GetArraySize(config_json.wgt_dark);
