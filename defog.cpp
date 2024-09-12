@@ -81,6 +81,7 @@ int main()
 
 	U32 d_t = t1 - t0;
 	LOG("sum time = %.3f.", (float)d_t / 1000);
+	system("pause");
 	return 0;
 }
 

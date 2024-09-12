@@ -1,6 +1,8 @@
 #ifndef _DEFOG_H_
 #define _DEFOG_H_
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <iostream>
 #include <windows.h> 
 #include <time.h>
