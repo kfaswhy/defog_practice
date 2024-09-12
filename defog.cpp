@@ -48,39 +48,45 @@ S32* sat_str = NULL;
 
 int main()
 {
+	//下面是色彩转换测试
+
+	RGB rgb = { 125,89,16 };
+	HSV hsv = { 0 };
 	t0 = clock();
-	char cfg_setting[] = "setting.config";
-	load_cfg(cfg_setting);
-	
-	char bmp_in[] = "C:/Work/Desktop/1.bmp";
-	RGB* img = NULL;
-
-	img = load_bmp(bmp_in);
-	
-	//save_bmp(bmp_out, img);
-
-	if (sampling_related_ratio != 0)
+	LOG("start.");
+	for (int k = 0; k < 100000000; k++)
 	{
-		w_samp = width / sampling_related_ratio;
-		h_samp = height / sampling_related_ratio;
+		hsv = rgb2hsv2(rgb);
 	}
+	LOG("hsv = %d,%d,%d.", hsv.h, hsv.s, hsv.v);
 
 
-	img_process(img);
 
-	////下面是采样测试
-	//RGB* img500 = NULL;
-	//img500 = img_sampling(img, width, height, w_samp, h_samp, LINEAR);
-	//char bmp_500[] = "C:/Work/Desktop/bmp_500.bmp";
-	//save_bmp(bmp_500, img500, w_samp, h_samp);
+	//char cfg_setting[] = "setting.config";
+	//load_cfg(cfg_setting);
+	//
+	//char bmp_in[] = "C:/Work/Desktop/1.bmp";
+	//RGB* img = NULL;
 
+	//img = load_bmp(bmp_in);
+	//
+	////save_bmp(bmp_out, img);
 
+	//if (sampling_related_ratio != 0)
+	//{
+	//	w_samp = width / sampling_related_ratio;
+	//	h_samp = height / sampling_related_ratio;
+	//}
+
+	//img_process(img);
 
 
 	t1 = clock();
-
 	U32 d_t = t1 - t0;
 	LOG("sum time = %.3f.", (float)d_t / 1000);
+
+
+
 	return 0;
 }
 
@@ -281,7 +287,7 @@ HSV rgb2hsv(RGB rgb) {
 	int delta = max - min;
 
 	HSV hsv;
-	hsv.v = max / 255.0;
+	hsv.v = max;
 
 	if (delta == 0) {
 		hsv.h = 0;
@@ -289,7 +295,7 @@ HSV rgb2hsv(RGB rgb) {
 		return hsv;
 	}
 
-	hsv.s = (float)delta / max;
+	hsv.s = delta * 255 / max;
 
 	if (r == max) {
 		hsv.h = 60 * ((g - b) / (float)delta);
@@ -307,6 +313,50 @@ HSV rgb2hsv(RGB rgb) {
 
 	return hsv;
 }
+
+HSV rgb2hsv2(RGB rgb) {
+	int r = rgb.r;
+	int g = rgb.g;
+	int b = rgb.b;
+
+	int max = r > g ? (r > b ? r : b) : (g > b ? g : b);
+	int min = r < g ? (r < b ? r : b) : (g < b ? g : b);
+	int delta = max - min;
+	int half_delta = (delta + 1) >> 1;
+
+	HSV hsv;
+	hsv.v = max;
+
+	if (delta == 0) {
+		hsv.h = 0;
+		hsv.s = 0;
+		return hsv;
+	}
+
+	hsv.s = 255 - ((min << 8) - min + (max + 1) >> 1) / max;
+
+	int d120 = 120 * delta;
+	int d240 = d120 << 1;
+
+
+	if (r == max) {
+		//hsv.h = 60 * ((g - b) / (float)delta);
+		hsv.h = (60 * (g - b) + half_delta) / delta;
+	}
+	else if (g == max) {
+		hsv.h = (60 * (b - r) + half_delta + d120) / delta;
+	}
+	else {
+		hsv.h = (60 * (r - g) + half_delta + d240) / delta;
+	}
+
+	if (hsv.h < 0) {
+		hsv.h += 360;
+	}
+
+	return hsv;
+}
+
 
 
 RGB hsv2rgb(HSV hsv)

@@ -8,6 +8,7 @@
 #include "cJSON.h"
 
 #define U64 unsigned long long
+#define S64 long long
 #define U32 unsigned int
 #define S32 int
 #define U16 unsigned short
@@ -40,8 +41,6 @@ typedef enum SAMP_METHOD
 	BILINEAR,
 };
 
-
-
 typedef struct _RGB
 {
 	BYTE b;
@@ -50,9 +49,9 @@ typedef struct _RGB
 }RGB;
 
 typedef struct {
-	double h;  
-	double s;
-	double v;
+	S32 h;
+	BYTE s;
+	BYTE v;
 }HSV;
 
 typedef struct
@@ -97,6 +96,12 @@ RGB* img_sampling(RGB* img, int w1, int h1, int w2, int h2, bool method);
 void print_prog(U32 cur_pos, U32 tgt);
 
 int img_gain(RGB* img);
+
+HSV rgb2hsv(RGB rgb);
+
+HSV rgb2hsv2(RGB rgb);
+
+RGB hsv2rgb(HSV hsv);
 
 int set_color(RGB* img);
 
