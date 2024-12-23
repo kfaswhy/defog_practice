@@ -52,7 +52,7 @@ int main()
 	char cfg_setting[] = "setting.config";
 	load_cfg(cfg_setting);
 	
-	char bmp_in[] = "C:/Work/Desktop/1.bmp";
+	char bmp_in[] = "1.bmp";
 	RGB* img = NULL;
 
 	img = load_bmp(bmp_in);
@@ -71,7 +71,7 @@ int main()
 	////下面是采样测试
 	//RGB* img500 = NULL;
 	//img500 = img_sampling(img, width, height, w_samp, h_samp, LINEAR);
-	//char bmp_500[] = "C:/Work/Desktop/bmp_500.bmp";
+	//char bmp_500[] = "bmp_500.bmp";
 	//save_bmp(bmp_500, img500, w_samp, h_samp);
 
 
@@ -156,23 +156,23 @@ int img_process(RGB* img)
 	//缩放图片
 	RGB* img_samp = NULL;
 	img_samp = img_sampling(img, width, height, w_samp, h_samp, LINEAR);
-	char bmp_samp[] = "C:/Work/Desktop/1_img_samp.bmp";
+	char bmp_samp[] = "1_img_samp.bmp";
 	save_bmp(bmp_samp, img_samp, w_samp, h_samp);
 	
 	//计算暗通道
 	RGB* img_dark = (RGB*)malloc(sizeof(RGB) * w_samp * h_samp);
 	calc_dark_chanel(img_samp, img_dark);
-	char bmp_dark[] = "C:/Work/Desktop/2_dark.bmp";
+	char bmp_dark[] = "2_dark.bmp";
 	save_bmp(bmp_dark, img_dark, w_samp, h_samp); 
 
 	//暗通道最小值滤波
 	calc_min_filtered(img_dark);
-	char bmp_dark_filtered[] = "C:/Work/Desktop/3_dark_filtered.bmp";
+	char bmp_dark_filtered[] = "3_dark_filtered.bmp";
 	save_bmp(bmp_dark_filtered, img_dark, w_samp, h_samp);
 
 	//暗通道高斯滤波
 	//calc_gauss_filtered(img_dark);
-	//char bmp_dark_gauss[] = "C:/Work/Desktop/4_dark_gauss.bmp";
+	//char bmp_dark_gauss[] = "4_dark_gauss.bmp";
 	//save_bmp(bmp_dark_gauss, img_dark);
 
 	//估算大气光
@@ -188,14 +188,14 @@ int img_process(RGB* img)
 	RGB* img_rec = (RGB*)malloc(sizeof(RGB) * height * width);
 	recover_img(img, img_rec, trans, light);
 
-	char bmp_recover[] = "C:/Work/Desktop/7_recover.bmp";
+	char bmp_recover[] = "7_recover.bmp";
 	save_bmp(bmp_recover, img_rec, width, height);
 
 	if (color_process == 1)
 	{
 		//调整饱和度
 		set_color(img_rec);
-		char bmp_color[] = "C:/Work/Desktop/8_color.bmp";
+		char bmp_color[] = "8_color.bmp";
 		save_bmp(bmp_color, img_rec, width, height);
 	}
 
@@ -660,7 +660,7 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 		}
 	}
 
-	char bmp_trans_dump[] = "C:/Work/Desktop/4_trans_dump.bmp";
+	char bmp_trans_dump[] = "4_trans_dump.bmp";
 	save_bmp(bmp_trans_dump, trans_dump, w_samp, h_samp);
 	//calc_gauss_filtered(trans_dump);
 	//calc_gauss_filtered(trans_dump);
@@ -669,14 +669,14 @@ int calc_trans(RGB* img, float* trans, RGB* img_dark, RGB light)
 
 
 	//透射率图双边滤波
-	char bmp_trans_gauss[] = "C:/Work/Desktop/5_trans_gauss.bmp";
+	char bmp_trans_gauss[] = "5_trans_gauss.bmp";
 	save_bmp(bmp_trans_gauss, trans_dump, w_samp, h_samp);
 
 
 	//透射率图放大至原始大小
 	RGB* trans_rec = NULL;
 	trans_rec = img_sampling(trans_dump, w_samp, h_samp, width, height, LINEAR);
-	char bmp_trans_rec[] = "C:/Work/Desktop/6_trans_rec.bmp";
+	char bmp_trans_rec[] = "6_trans_rec.bmp";
 	save_bmp(bmp_trans_rec, trans_rec, width, height);
 
 
